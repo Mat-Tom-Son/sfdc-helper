@@ -1,0 +1,38 @@
+{
+  "name": "sfdc-helper",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "query": "node src/query.js",
+    "start": "node src/server.js",
+    "selftest": "node src/selftest.js",
+    "example": "node examples/client-usage.js",
+    "example:ts": "npx ts-node examples/typescript-example.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "sfdc-helper": "bin/sfdc-helper"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "types/",
+    "examples/",
+    "index.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "keywords": ["salesforce", "jsforce", "api", "read-only", "chatbot", "sdk", "client", "org-aware", "typescript"],
+  "author": "Matt Thompson",
+  "license": "MIT",
+  "description": "Org-aware, read-only Salesforce API layer with safe SOQL, SOSL, schema, analytics, and self-test.",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsforce": "^3.10.4",
+    "undici": "^7.15.0"
+  }
+}
