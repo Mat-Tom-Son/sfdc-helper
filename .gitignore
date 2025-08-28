@@ -95,3 +95,6 @@ context_bundles/
 # Temporary files
 tmp/
 temp/
+ 
+# Build artifacts
+dist/
