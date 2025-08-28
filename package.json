@@ -10,6 +10,7 @@
     "selftest": "node src/selftest.js",
     "example": "node examples/client-usage.js",
     "example:ts": "npx ts-node examples/typescript-example.ts",
+    "pack:client": "node scripts/pack-client.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
