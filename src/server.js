@@ -141,7 +141,7 @@ app.get('/query', asyncHandler(async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err && err.message ? err.message : String(err) });
   }
-});
+}));
 
 // POST /query - JSON body { soql: string, limit?: number }
 app.post('/query', async (req, res) => {
@@ -1079,6 +1079,50 @@ app.post('/search', async (req, res) => {
     res.json({ items: result });
   } catch (err) {
     res.status(500).json({ error: err && err.message ? err.message : String(err) });
+  }
+});
+
+// Natural Language Chat Endpoint
+app.post('/chat', async (req, res) => {
+  try {
+    const { userId = 'default', message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Message is required' 
+      });
+    }
+
+    // Initialize chat agent (you could cache this)
+    const SFDCHelperClient = require('./client');
+    const { QuickSetup } = require('./chat');
+    const { HttpLlmAdapter } = require('./chat/LlmAdapter');
+    
+    const sfdcClient = new SFDCHelperClient(`http://localhost:${port}`);
+    // If LLM_HTTP_URL is set, wire an HTTP adapter; otherwise require caller to supply llmAdapter upstream
+    const llmAdapter = process.env.LLM_HTTP_URL ? new HttpLlmAdapter(process.env.LLM_HTTP_URL) : undefined;
+    const chatAgent = QuickSetup.sales(sfdcClient, llmAdapter ? { llmAdapter } : {});
+    
+    console.log(`[Chat] User ${userId}: ${message}`);
+    
+    const response = await chatAgent.processMessage(userId, message);
+    
+    res.json({
+      success: true,
+      message: response.response,
+      recordCount: response.functionResult?.recordCount || 0,
+      queryType: response.functionResult?.queryType,
+      bundleUsed: response.functionResult?.bundleUsed || false,
+      dynamicQuery: response.functionResult?.dynamicQuery || false
+    });
+    
+  } catch (error) {
+    console.error('[Chat] Error:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 

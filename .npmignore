@@ -1,0 +1,16 @@
+# Exclude tests from published package
+src/**/test/**
+**/*.test.js
+**/*.spec.js
+
+# Common local artifacts
+*.log
+.DS_Store
+npm-debug.log*
+
+# Exclude local data and tokens
+selftest-report.json
+tokens.json
+/data/**
+/context/**
+/context_bundles/**

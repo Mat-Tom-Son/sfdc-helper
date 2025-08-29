@@ -86,7 +86,7 @@ class SFDCHelperClient {
    */
   async getAvailableFields(objectName) {
     const allowlist = await this.getAllowlist();
-    const objectSpec = allowlist[objectName];
+    const objectSpec = allowlist.objects?.[objectName] || allowlist[objectName];
     return objectSpec ? objectSpec.fields : [];
   }
 
@@ -95,7 +95,7 @@ class SFDCHelperClient {
    */
   async getDefaultFields(objectName) {
     const allowlist = await this.getAllowlist();
-    const objectSpec = allowlist[objectName];
+    const objectSpec = allowlist.objects?.[objectName] || allowlist[objectName];
     return objectSpec ? (objectSpec.defaultFields || objectSpec.fields.slice(0, 8)) : [];
   }
 

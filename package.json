@@ -1,17 +1,38 @@
 {
   "name": "sfdc-helper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "commonjs",
   "main": "index.js",
   "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "types": "./types/index.d.ts"
+    },
+    "./client": {
+      "require": "./src/client.js",
+      "types": "./types/index.d.ts"
+    }
+  },
   "scripts": {
     "query": "node src/query.js",
     "start": "node src/server.js",
     "selftest": "node src/selftest.js",
     "example": "node examples/client-usage.js",
     "example:ts": "npx ts-node examples/typescript-example.ts",
-    "pack:client": "node scripts/pack-client.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "chat": "node examples/chat-agent-demo.js",
+    "chat:interactive": "node examples/chat-agent-demo.js --interactive",
+    "test": "node src/chat/test/run-all-tests.js",
+    "test:chat": "node src/chat/test/run-all-tests.js",
+    "test:goal": "node src/chat/test/Goal.test.js",
+    "test:manager": "node src/chat/test/GoalManager.test.js",
+    "test:agent": "node src/chat/test/ChatAgent.test.js",
+    "test:runtime": "node examples/runtime-integration-test.js",
+    "test:enhanced": "node examples/enhanced-chat-test.js",
+    "demo:integration": "node examples/quick-integration-example.js",
+    "demo:fast": "node examples/fast-debug-test.js",
+    "demo:verbose": "node examples/verbose-debug-test.js",
+    "pack:client": "node scripts/pack-client.js"
   },
   "bin": {
     "sfdc-helper": "bin/sfdc-helper"
@@ -20,12 +41,27 @@
     "bin/",
     "src/",
     "types/",
-    "examples/",
     "index.js",
     "LICENSE",
     "README.md"
   ],
-  "keywords": ["salesforce", "jsforce", "api", "read-only", "chatbot", "sdk", "client", "org-aware", "typescript"],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "salesforce",
+    "jsforce",
+    "api",
+    "read-only",
+    "chatbot",
+    "sdk",
+    "client",
+    "org-aware",
+    "typescript"
+  ],
   "author": "Matt Thompson",
   "license": "MIT",
   "description": "Org-aware, read-only Salesforce API layer with safe SOQL, SOSL, schema, analytics, and self-test.",

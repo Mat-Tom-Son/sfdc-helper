@@ -1,0 +1,26 @@
+{
+  "goals": {
+    "pipeline_health_1756415341623_w3w34": {
+      "id": "pipeline_health_1756415341623_w3w34",
+      "type": "pipeline_health",
+      "userId": "demo_user",
+      "status": "active",
+      "createdAt": "2025-08-28T21:09:01.624Z",
+      "updatedAt": "2025-08-28T21:09:01.624Z",
+      "currentStep": 0,
+      "context": {},
+      "progress": [],
+      "customSteps": null
+    }
+  },
+  "userGoals": {
+    "demo_user": [
+      "pipeline_health_1756415341623_w3w34"
+    ]
+  },
+  "metadata": {
+    "version": "1.0",
+    "savedAt": "2025-08-28T21:09:01.624Z",
+    "totalGoals": 1
+  }
+}

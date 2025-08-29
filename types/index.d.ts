@@ -88,6 +88,10 @@ export interface Allowlist {
   [objectName: string]: AllowlistObjectSpec;
 }
 
+export interface AllowlistResponse {
+  objects: Record<string, AllowlistObjectSpec>;
+}
+
 export interface AllowlistStats {
   dynamic: boolean;
   message?: string;
@@ -384,7 +388,7 @@ export declare class SFDCHelperClient {
   getOrgInfo(): Promise<OrgInfo>;
 
   // Allowlist management
-  getAllowlist(refresh?: boolean): Promise<Allowlist>;
+  getAllowlist(refresh?: boolean): Promise<Allowlist | AllowlistResponse>;
   getAllowlistStats(): Promise<AllowlistStats>;
   refreshAllowlist(): Promise<{ message: string; stats: AllowlistStats['stats'] }>;
   getAvailableFields(objectName: string): Promise<string[]>;
@@ -430,21 +434,10 @@ export interface Utils {
 }
 
 // Main package exports
-export interface SFDCHelperPackage {
-  SFDCHelperClient: typeof SFDCHelperClient;
-  Client: typeof SFDCHelperClient;
-  default: typeof SFDCHelperClient;
-  allowlist: AllowlistUtils;
-  utils: Utils;
-  server: any; // Express app - keeping as any to avoid Express dependencies
-}
-
 // Default export
-declare const sfdcHelper: SFDCHelperPackage;
-export default sfdcHelper;
+export default SFDCHelperClient;
 
 // Named exports
 export { SFDCHelperClient as Client };
 export const allowlist: AllowlistUtils;
 export const utils: Utils;
-export const server: any;
