@@ -15,16 +15,18 @@ class ChatAgent {
   constructor(sfdcClient, options = {}) {
     this.sfdcClient = sfdcClient;
     this.goalManager = new GoalManager(options.goalManager || {});
-    
+
     // Initialize context bundle reader for fast org-aware context
     this.contextReader = new ContextBundleReader(options.bundleDir);
-    
+
     // Initialize LLM adapter (BYO-LLM). Prefer provided adapter, else optional HTTP adapter via env.
     this.llm = options.llmAdapter || (process.env.LLM_HTTP_URL ? new HttpLlmAdapter(process.env.LLM_HTTP_URL) : new BaseLlmAdapter());
 
     // Conversation memory - userId -> conversation history
     this.conversations = new Map();
     this.maxHistoryLength = options.maxHistoryLength || 20;
+    this.maxConversations = options.maxConversations || 1000;
+    this.conversationMaxAge = options.conversationMaxAge || 24 * 60 * 60 * 1000; // 24 hours
 
     // Agent personality and behavior settings
     this.agentName = options.agentName || 'Salesforce Assistant';
@@ -33,6 +35,11 @@ class ChatAgent {
 
     // Initialize function definitions for tools
     this.functions = this.initializeFunctions();
+
+    // Start cleanup interval (every hour)
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupStaleConversations();
+    }, 60 * 60 * 1000); // 1 hour
   }
 
   /**
@@ -677,18 +684,22 @@ Remember: I'm here to help you understand your Salesforce sales data, manage ter
     const objectName = result.query?.object || 'records';
     const fieldsUsed = result.orgContext?.fieldsUsed || [];
     const customFieldsUsed = fieldsUsed.filter(f => f.includes('__c'));
-    
+
+    // Use orgInsights if provided and allFields is empty
+    const totalFieldsCount = allFields.length > 0 ? allFields.length : (orgInsights?.summary?.fieldsCount || 0);
+    const customFieldsCount = customFields.length;
+
     return {
       summary: `Found ${recordCount} ${objectName} records from your org`,
       pattern: suggestion ? `using your org's "${suggestion.title}" pattern` : 'using intelligent field selection',
-      significance: recordCount > 0 ? 
-        `These ${recordCount} records include data from ${allFields.length} total fields available in your org` : 
+      significance: recordCount > 0 ?
+        `These ${recordCount} records include data from ${totalFieldsCount} total fields available in your org` :
         'No matching records found in your org with the current criteria',
-      orgContext: `Your org has ${allFields.length} total fields for ${objectName} (${customFields.length} custom fields, ${allFields.length - customFields.length} standard)`,
-      fieldInsights: customFieldsUsed.length > 0 ? 
-        `Query used ${customFieldsUsed.length} of your custom fields: ${customFieldsUsed.join(', ')}` : 
-        `Query used ${fieldsUsed.length} fields - your org has ${customFields.length} additional custom fields available`,
-      businessContext: customFields.length > 0 ? 
+      orgContext: `Your org has ${totalFieldsCount} total fields for ${objectName}${customFieldsCount > 0 ? ` (${customFieldsCount} custom fields, ${totalFieldsCount - customFieldsCount} standard)` : ''}`,
+      fieldInsights: customFieldsUsed.length > 0 ?
+        `Query used ${customFieldsUsed.length} of your custom fields: ${customFieldsUsed.join(', ')}` :
+        `Query used ${fieldsUsed.length} fields - your org has ${customFieldsCount} additional custom fields available`,
+      businessContext: customFields.length > 0 ?
         `Your org's custom fields include: ${customFields.slice(0, 5).join(', ')}${customFields.length > 5 ? ` and ${customFields.length - 5} more` : ''}` :
         'Using standard Salesforce fields for this query'
     };
@@ -735,6 +746,50 @@ Remember: I'm here to help you understand your Salesforce sales data, manage ter
    */
   clearConversation(userId) {
     this.conversations.delete(userId);
+  }
+
+  /**
+   * Cleanup stale conversations (memory leak prevention)
+   */
+  cleanupStaleConversations() {
+    const now = Date.now();
+    let cleaned = 0;
+
+    // Remove conversations older than maxAge
+    for (const [userId, conv] of this.conversations) {
+      const age = now - conv.startedAt.getTime();
+      if (age > this.conversationMaxAge) {
+        this.conversations.delete(userId);
+        cleaned++;
+      }
+    }
+
+    // If still over limit, remove oldest conversations
+    if (this.conversations.size > this.maxConversations) {
+      const sortedConvs = Array.from(this.conversations.entries())
+        .sort((a, b) => a[1].startedAt - b[1].startedAt);
+
+      const toRemove = this.conversations.size - this.maxConversations;
+      for (let i = 0; i < toRemove; i++) {
+        this.conversations.delete(sortedConvs[i][0]);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`[ChatAgent] Cleaned up ${cleaned} stale conversations`);
+    }
+  }
+
+  /**
+   * Destroy the agent and cleanup resources
+   */
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.conversations.clear();
   }
 
   /**
