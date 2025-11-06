@@ -1,26 +1,28 @@
 {
   "goals": {
-    "pipeline_health_1756415341623_w3w34": {
-      "id": "pipeline_health_1756415341623_w3w34",
+    "pipeline_health_1762463883073_8fm12": {
+      "id": "pipeline_health_1762463883073_8fm12",
       "type": "pipeline_health",
-      "userId": "demo_user",
+      "userId": "user123",
       "status": "active",
-      "createdAt": "2025-08-28T21:09:01.624Z",
-      "updatedAt": "2025-08-28T21:09:01.624Z",
+      "createdAt": "2025-11-06T21:18:03.073Z",
+      "updatedAt": "2025-11-06T21:18:03.073Z",
       "currentStep": 0,
-      "context": {},
+      "context": {
+        "objectName": "Opportunity"
+      },
       "progress": [],
       "customSteps": null
     }
   },
   "userGoals": {
-    "demo_user": [
-      "pipeline_health_1756415341623_w3w34"
+    "user123": [
+      "pipeline_health_1762463883073_8fm12"
     ]
   },
   "metadata": {
     "version": "1.0",
-    "savedAt": "2025-08-28T21:09:01.624Z",
+    "savedAt": "2025-11-06T21:18:03.073Z",
     "totalGoals": 1
   }
 }
