@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { getConnection } = require('./sfConnection');
 const { extractObjectName, extractFields } = require('./soqlUtils');
 const analytics = require('./analytics');
@@ -19,17 +20,46 @@ const { errorHandlerMiddleware, asyncHandler, enhanceError } = require('./errorH
 const fs = require('fs');
 const path = require('path');
 
+// Middleware imports
+const { logger, requestLogger, logQuery, logError } = require('./middleware/logger');
+const { requireApiKey, optionalApiKey } = require('./middleware/auth');
+const { apiLimiter, strictLimiter } = require('./middleware/rateLimiter');
+const {
+  validateSafeQuery,
+  validateQuery,
+  validateSearch,
+  validateObjectInsights,
+  validateContextBundle,
+  validateChanges,
+  validateChat
+} = require('./middleware/validation');
+
 // Initialize dynamic allowlist
 let dynamicAllowlist = null;
 try {
   dynamicAllowlist = require('./dynamicAllowlist');
 } catch (_) {
-  console.log('[server] Dynamic allowlist not available, using static only');
+  logger.info('Dynamic allowlist not available, using static only');
 }
 
 const app = express();
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Allow for API usage
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+app.use(requestLogger); // Log all requests
+
+// Apply rate limiting to all API routes
+app.use('/api/*', apiLimiter);
+
+// Apply API key authentication to protected routes
+// Health endpoints are excluded in the auth middleware
+app.use(requireApiKey);
 
 // Initialize dynamic allowlist on startup
 async function initializeDynamicAllowlist() {
@@ -37,9 +67,9 @@ async function initializeDynamicAllowlist() {
     try {
       const contextBundlesDir = path.resolve(process.cwd(), 'context_bundles');
       await dynamicAllowlist.initialize(contextBundlesDir);
-      console.log('[server] Dynamic allowlist initialized');
+      logger.info('Dynamic allowlist initialized');
     } catch (err) {
-      console.warn('[server] Failed to initialize dynamic allowlist:', err.message);
+      logger.warn('Failed to initialize dynamic allowlist', { error: err.message });
     }
   }
 }
@@ -57,9 +87,51 @@ function parsePositiveInt(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-// Health
+// Serve static admin dashboard
+app.use('/admin', express.static(path.join(__dirname, '../public')));
+app.get('/', (req, res) => {
+  res.redirect('/admin/admin.html');
+});
+
+// Enhanced Health Check Endpoints
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: require('../package.json').version
+  });
+});
+
+// Liveness probe (always returns 200 if server is running)
+app.get('/health/live', (_req, res) => {
+  res.json({
+    status: 'alive',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Readiness probe (checks Salesforce connectivity)
+app.get('/health/ready', async (req, res) => {
+  try {
+    const conn = await getConnection();
+    await conn.query('SELECT Id FROM User LIMIT 1');
+
+    res.json({
+      status: 'ready',
+      salesforce: 'connected',
+      instanceUrl: conn.instanceUrl,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    logger.error('Readiness check failed', { error: err.message });
+
+    res.status(503).json({
+      status: 'not ready',
+      salesforce: 'disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Dynamic allowlist stats and refresh
@@ -904,7 +976,7 @@ app.post('/objects/:name/context', async (req, res) => {
 
 // Segmented bundle export with timestamped folder and query runs
 // POST /objects/:name/context/bundle { persist: true, dir?: string, runQueries?: boolean, sample?: number, verbose?: boolean }
-app.post('/objects/:name/context/bundle', async (req, res) => {
+app.post('/objects/:name/context/bundle', strictLimiter, validateContextBundle, async (req, res) => {
   const name = req.params.name;
   const persist = !!(req.body && req.body.persist);
   const baseDir = (req.body && req.body.dir) || path.resolve(process.cwd(), 'context_bundles');
@@ -1044,7 +1116,7 @@ app.get('/changes/:name', async (req, res) => {
 
 // Safe Query (READ-ONLY)
 // Body: { object: string, fields?: string[], where?: Array<{field, op, value}> | {[field]: value}, orderBy?: Array<{ field, direction }> | { field, direction }, limit?: number, flatten?: boolean }
-app.post('/safe-query', async (req, res) => {
+app.post('/safe-query', validateSafeQuery, async (req, res) => {
   try {
     const payload = req.body || {};
     const built = buildSafeSoql(payload);
@@ -1067,7 +1139,7 @@ app.post('/safe-query', async (req, res) => {
 
 // SOSL (READ-ONLY)
 // Body: { sosl: string }
-app.post('/search', async (req, res) => {
+app.post('/search', validateSearch, async (req, res) => {
   const sosl = req.body && req.body.sosl;
   if (!sosl) return res.status(400).json({ error: 'Missing body.sosl' });
   try {
@@ -1083,7 +1155,7 @@ app.post('/search', async (req, res) => {
 });
 
 // Natural Language Chat Endpoint
-app.post('/chat', async (req, res) => {
+app.post('/chat', validateChat, async (req, res) => {
   try {
     const { userId = 'default', message } = req.body;
     
@@ -1116,12 +1188,12 @@ app.post('/chat', async (req, res) => {
       bundleUsed: response.functionResult?.bundleUsed || false,
       dynamicQuery: response.functionResult?.dynamicQuery || false
     });
-    
+
   } catch (error) {
-    console.error('[Chat] Error:', error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    logger.error('Chat endpoint error', { error: error.message, userId: req.body.userId });
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -1131,7 +1203,23 @@ app.use(errorHandlerMiddleware);
 
 const port = parsePositiveInt(getEnv('PORT', '3000'), 3000);
 app.listen(port, () => {
-  console.log(`[server] Listening on http://localhost:${port}`);
+  logger.info(`SFDC Helper server started`, {
+    port,
+    url: `http://localhost:${port}`,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    authEnabled: process.env.DISABLE_AUTH !== 'true'
+  });
+
+  logger.info('API Endpoints:');
+  logger.info(`  Health: http://localhost:${port}/health`);
+  logger.info(`  API Docs: http://localhost:${port}/openapi.json`);
+  logger.info(`  Ready check: http://localhost:${port}/health/ready`);
+
+  if (process.env.DISABLE_AUTH === 'true') {
+    logger.warn('⚠️  Authentication is DISABLED - not secure for production!');
+  } else {
+    logger.info('🔒 API authentication is ENABLED');
+  }
 });
 
 

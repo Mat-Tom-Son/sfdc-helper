@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFDC Helper - Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status.online {
+            background: #10b981;
+            color: white;
+        }
+
+        .status.offline {
+            background: #ef4444;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .response {
+            background: #f3f4f6;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .response pre {
+            margin: 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        .success {
+            color: #10b981;
+        }
+
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        .info-box code {
+            background: #dbeafe;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .endpoint-list {
+            list-style: none;
+        }
+
+        .endpoint-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f9fafb;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .endpoint-list .method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .method.get { background: #10b981; color: white; }
+        .method.post { background: #3b82f6; color: white; }
+
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #667eea;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 SFDC Helper - Admin Dashboard</h1>
+            <p>Manage and test your SFDC Helper API</p>
+            <div class="status" id="status">⏳ Checking status...</div>
+        </div>
+
+        <div class="grid">
+            <!-- Health Check Card -->
+            <div class="card">
+                <h2>🏥 Health Check</h2>
+                <div class="info-box">
+                    Test the server connection and Salesforce readiness
+                </div>
+                <button onclick="checkHealth()">Check Health</button>
+                <button onclick="checkReady()">Check Readiness</button>
+                <div class="response" id="health-response" style="display: none;"></div>
+            </div>
+
+            <!-- Query Playground -->
+            <div class="card">
+                <h2>🔍 Query Playground</h2>
+                <div class="form-group">
+                    <label>Object Name</label>
+                    <select id="query-object">
+                        <option value="Opportunity">Opportunity</option>
+                        <option value="Account">Account</option>
+                        <option value="Contact">Contact</option>
+                        <option value="Lead">Lead</option>
+                        <option value="Case">Case</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fields (comma-separated)</label>
+                    <input type="text" id="query-fields" placeholder="Id,Name,StageName,Amount" />
+                </div>
+                <div class="form-group">
+                    <label>Limit</label>
+                    <input type="number" id="query-limit" value="10" min="1" max="200" />
+                </div>
+                <button onclick="runQuery()">Run Query</button>
+                <div class="response" id="query-response" style="display: none;"></div>
+            </div>
+
+            <!-- API Key Manager -->
+            <div class="card">
+                <h2>🔑 API Key</h2>
+                <div class="info-box">
+                    Add your API key to authenticate requests. Find it in the server startup logs or <code>.env</code> file.
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" id="api-key" placeholder="sk_..." />
+                </div>
+                <button onclick="saveApiKey()">Save API Key</button>
+                <div class="response" id="key-response" style="display: none;"></div>
+            </div>
+
+            <!-- Available Endpoints -->
+            <div class="card">
+                <h2>📡 Available Endpoints</h2>
+                <ul class="endpoint-list">
+                    <li><span class="method get">GET</span> /health</li>
+                    <li><span class="method get">GET</span> /health/ready</li>
+                    <li><span class="method get">GET</span> /me</li>
+                    <li><span class="method get">GET</span> /allowlist</li>
+                    <li><span class="method post">POST</span> /safe-query</li>
+                    <li><span class="method get">GET</span> /query</li>
+                    <li><span class="method post">POST</span> /search</li>
+                    <li><span class="method get">GET</span> /describe</li>
+                    <li><span class="method get">GET</span> /openapi.json</li>
+                </ul>
+                <button onclick="window.open('/openapi.json', '_blank')">View API Docs</button>
+            </div>
+
+            <!-- Org Info -->
+            <div class="card">
+                <h2>🏢 Org Information</h2>
+                <button onclick="getOrgInfo()">Get Org Info</button>
+                <div class="response" id="org-response" style="display: none;"></div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <h2>⚡ Quick Actions</h2>
+                <button onclick="getAllowlist()">View Allowlist</button>
+                <button onclick="getObjectList()">List Objects</button>
+                <button onclick="window.open('http://localhost:3000/openapi.json', '_blank')">Open API Spec</button>
+                <div class="response" id="quick-response" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let apiKey = localStorage.getItem('sfdc-helper-api-key') || '';
+
+        // Load saved API key on page load
+        if (apiKey) {
+            document.getElementById('api-key').value = apiKey;
+        }
+
+        async function makeRequest(method, path, body = null) {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+
+            if (apiKey) {
+                headers['X-API-Key'] = apiKey;
+            }
+
+            const options = {
+                method,
+                headers
+            };
+
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+
+            try {
+                const response = await fetch(API_BASE + path, options);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function showResponse(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+
+            if (result.success) {
+                element.innerHTML = '<pre class="success">' + JSON.stringify(result.data, null, 2) + '</pre>';
+            } else {
+                element.innerHTML = '<pre class="error">Error: ' + result.error + '</pre>';
+            }
+        }
+
+        async function checkStatus() {
+            const result = await makeRequest('GET', '/health');
+            const statusEl = document.getElementById('status');
+
+            if (result.success) {
+                statusEl.textContent = '✅ Online';
+                statusEl.className = 'status online';
+            } else {
+                statusEl.textContent = '❌ Offline';
+                statusEl.className = 'status offline';
+            }
+        }
+
+        async function checkHealth() {
+            const result = await makeRequest('GET', '/health');
+            showResponse('health-response', result);
+        }
+
+        async function checkReady() {
+            const result = await makeRequest('GET', '/health/ready');
+            showResponse('health-response', result);
+        }
+
+        async function runQuery() {
+            const object = document.getElementById('query-object').value;
+            const fieldsStr = document.getElementById('query-fields').value;
+            const limit = parseInt(document.getElementById('query-limit').value);
+
+            const fields = fieldsStr ? fieldsStr.split(',').map(f => f.trim()) : undefined;
+
+            const result = await makeRequest('POST', '/safe-query', {
+                object,
+                fields,
+                limit,
+                flatten: true
+            });
+
+            showResponse('query-response', result);
+        }
+
+        function saveApiKey() {
+            apiKey = document.getElementById('api-key').value;
+            localStorage.setItem('sfdc-helper-api-key', apiKey);
+
+            const responseEl = document.getElementById('key-response');
+            responseEl.style.display = 'block';
+            responseEl.innerHTML = '<pre class="success">API key saved! Try making requests now.</pre>';
+
+            setTimeout(() => {
+                responseEl.style.display = 'none';
+            }, 3000);
+        }
+
+        async function getOrgInfo() {
+            const result = await makeRequest('GET', '/me');
+            showResponse('org-response', result);
+        }
+
+        async function getAllowlist() {
+            const result = await makeRequest('GET', '/allowlist');
+            showResponse('quick-response', result);
+        }
+
+        async function getObjectList() {
+            const result = await makeRequest('GET', '/describe');
+            showResponse('quick-response', result);
+        }
+
+        // Check status on page load
+        checkStatus();
+
+        // Auto-refresh status every 30 seconds
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>

@@ -15,6 +15,7 @@
     }
   },
   "scripts": {
+    "setup": "node bin/setup.js",
     "query": "node src/query.js",
     "start": "node src/server.js",
     "selftest": "node src/selftest.js",
@@ -69,7 +70,11 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.4.1",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.0.0",
     "jsforce": "^3.10.4",
-    "undici": "^7.15.0"
+    "undici": "^7.15.0",
+    "winston": "^3.17.0"
   }
 }

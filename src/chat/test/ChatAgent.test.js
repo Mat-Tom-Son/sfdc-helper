@@ -65,6 +65,24 @@ class MockSFDCClient {
     return this.mockData.insights;
   }
 
+  async describeObject(objectName) {
+    return {
+      name: objectName,
+      fields: [
+        { name: 'Id', type: 'id' },
+        { name: 'Name', type: 'string' },
+        { name: 'StageName', type: 'picklist' },
+        { name: 'Amount', type: 'currency' },
+        { name: 'CloseDate', type: 'date' },
+        { name: 'Custom_Field__c', type: 'string' }
+      ]
+    };
+  }
+
+  async safeQuery(objectName, options = {}) {
+    return this.mockData.queryResult.results;
+  }
+
   async executeSmartQuery(objectName, intent, options = {}) {
     return this.mockData.queryResult;
   }
@@ -174,7 +192,8 @@ runner.test('ChatAgent can execute query_salesforce function', async () => {
   runner.assert(result.results, 'Should return query results');
   runner.assert(result.interpretation, 'Should include interpretation');
   runner.assert(result.recordCount === 2, 'Should count records correctly');
-  runner.assertEqual(result.queryType, 'smart_query', 'Should identify as smart query');
+  runner.assert(result.queryType, 'Should have a query type');
+  runner.assert(['smart_query', 'org_aware_query', 'context_bundle_query', 'dynamic_custom_field_query'].includes(result.queryType), 'Should identify query type correctly');
 });
 
 runner.test('ChatAgent can execute get_org_insights function', async () => {
@@ -234,7 +253,7 @@ runner.test('ChatAgent interprets query results with context', () => {
   
   runner.assert(interpretation.summary.includes('2'), 'Should count records');
   runner.assert(interpretation.pattern.includes('Recent deals'), 'Should mention pattern used');
-  runner.assert(interpretation.orgContext.includes('50 fields'), 'Should include org context');
+  runner.assert(interpretation.orgContext.includes('50'), 'Should include org context with field count');
 });
 
 // Goal Update Detection Tests
@@ -297,18 +316,19 @@ runner.test('ChatAgent can clear conversation history', () => {
 runner.test('ChatAgent handles function call errors gracefully', async () => {
   const mockSFDC = new MockSFDCClient();
   // Override method to throw error
-  mockSFDC.executeSmartQuery = async () => {
+  mockSFDC.describeObject = async () => {
     throw new Error('Mock SFDC error');
   };
-  
+
   const agent = new ChatAgent(mockSFDC, { llmAdapter: new MockLlmAdapter() });
-  
+
   const result = await agent.executeFunctionCall('user123', {
     name: 'query_salesforce',
     arguments: JSON.stringify({ objectName: 'Opportunity', intent: 'test' })
   });
-  
+
   runner.assert(result.error, 'Should return error in result');
+  runner.assert(typeof result.error === 'string', 'Error should be a string');
   runner.assert(result.error.includes('Mock SFDC error'), 'Should include original error message');
   runner.assertEqual(result.function, 'query_salesforce', 'Should identify failed function');
 });
