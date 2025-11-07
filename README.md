@@ -50,6 +50,199 @@ SFDC Helper is a secure, read-only Salesforce API layer that combines safe SOQL/
 
 ---
 
+## 🔌 Salesforce Setup & Prerequisites
+
+Before using SFDC Helper, you'll need access to a Salesforce org and credentials. The good news: **it's easier than you might think!**
+
+### What You Need from Salesforce
+
+SFDC Helper is **read-only** and works with **any Salesforce user account** - no special API user or admin privileges required. Choose the authentication method that works best for your situation:
+
+---
+
+### Authentication Methods
+
+#### Option 1: Username + Password (Simplest)
+
+**Best for:** Testing, sandboxes, non-SSO orgs
+
+**What you need:**
+- Your regular Salesforce username (email)
+- Your Salesforce password
+- Security token (only if your IP isn't whitelisted)
+
+**How to get your security token:**
+
+1. Log into Salesforce
+2. Click your profile picture → **Settings**
+3. In the left sidebar: **My Personal Information** → **Reset My Security Token**
+4. Click **Reset Security Token** - it will be emailed to you
+5. Copy the token from the email (it's a random string like `AbCd1234EfGh5678`)
+
+**When you DON'T need a security token:**
+If your organization has whitelisted your IP address (common for office networks), you can skip the security token entirely. Try without it first - if login fails, then add the token.
+
+**For Sandbox users:**
+Use your sandbox credentials. During setup, answer "yes" when asked if it's a sandbox.
+
+---
+
+#### Option 2: OAuth with Connected App (Most Secure)
+
+**Best for:** Production deployments, SSO-enabled orgs, CI/CD pipelines
+
+**What you need:**
+- A Connected App in Salesforce (you'll create this)
+- Consumer Key (Client ID)
+- Consumer Secret (Client Secret)
+- Refresh Token
+
+**Step-by-step OAuth setup:**
+
+**Step 1: Create a Connected App**
+
+1. Log into Salesforce as an admin (or ask your admin to do this)
+2. Go to **Setup** → type "App Manager" in Quick Find
+3. Click **New Connected App**
+4. Fill in the basic info:
+   - **Connected App Name:** `SFDC Helper` (or any name)
+   - **API Name:** Will auto-populate
+   - **Contact Email:** Your email
+5. Check **Enable OAuth Settings**
+6. **Callback URL:** `http://localhost:3000/oauth/callback`
+   - Or use your own callback URL if you're building a custom flow
+7. **Selected OAuth Scopes:** Add these scopes:
+   - `Access and manage your data (api)`
+   - `Perform requests on your behalf at any time (refresh_token, offline_access)`
+   - `Access your basic information (id, profile, email, address, phone)`
+8. Click **Save**, then **Continue**
+9. Click **Manage Consumer Details** to see your credentials
+10. Copy the **Consumer Key** (this is your Client ID)
+11. Copy the **Consumer Secret** (this is your Client Secret)
+
+**Step 2: Get a Refresh Token**
+
+Getting a refresh token requires a one-time OAuth flow. You have a few options:
+
+**Option A: Use Salesforce CLI (sfdx)**
+```bash
+# Install Salesforce CLI if you don't have it
+npm install -g @salesforce/cli
+
+# Authenticate and get tokens
+sf org login web --set-default --instance-url https://login.salesforce.com
+
+# View the refresh token
+sf org display --verbose
+```
+
+**Option B: Use a Web OAuth Flow**
+
+1. Open this URL in your browser (replace `YOUR_CLIENT_ID` with your Consumer Key):
+```
+https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost:3000/oauth/callback&scope=api%20refresh_token
+```
+
+2. Log in and authorize the app
+3. You'll be redirected with a `code` parameter - copy it
+4. Exchange the code for tokens using curl:
+```bash
+curl -X POST https://login.salesforce.com/services/oauth2/token \
+  -d "grant_type=authorization_code" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "redirect_uri=http://localhost:3000/oauth/callback" \
+  -d "code=YOUR_CODE_FROM_STEP_3"
+```
+
+5. Copy the `refresh_token` from the JSON response
+
+**Option C: Use Postman OAuth Helper**
+Postman has a built-in OAuth 2.0 flow that can help you get tokens - see Salesforce OAuth documentation.
+
+---
+
+### Special Cases & FAQs
+
+**Q: My org uses SSO and I don't have a username/password. Can I still use this?**
+
+A: **Yes!** Use the OAuth method (Option 2). OAuth works perfectly with SSO because it uses your browser to authenticate. You'll log in through your normal SSO flow, then SFDC Helper gets a refresh token it can use going forward.
+
+**Q: Does SFDC Helper launch a browser for authentication?**
+
+A: Not currently. The OAuth setup requires you to get a refresh token manually (one time), but after that, tokens are automatically refreshed in the background. No browser needed during operation.
+
+**Q: Do I need a special "API user" or "integration user"?**
+
+A: **Nope!** Your regular user account works fine. Since SFDC Helper is read-only, it only needs permission to query data - whatever you can see in Salesforce, the helper can query.
+
+**Q: What permissions does my user need?**
+
+A: Just standard user permissions. Specifically:
+- **API Enabled** - Your user profile must have "API Enabled" checked (most do by default)
+- **Object/Field Access** - You can only query objects and fields you have read access to
+- No admin privileges required
+- No special API-only permissions needed
+
+**Q: Will this use up my API limits?**
+
+A: Yes, SFDC Helper uses your org's standard API limits. Each query counts as one API call. Check your limits:
+- Log into Salesforce → Setup → System Overview → API Usage
+- Most orgs have 15,000-1,000,000+ API calls per day depending on edition
+
+**Q: Can I use this with a Trailhead Playground or Developer Edition?**
+
+A: **Absolutely!** It works great with:
+- Trailhead Playgrounds
+- Developer Edition orgs
+- Sandbox orgs
+- Production orgs
+
+**Q: Is my data secure?**
+
+A: Yes! SFDC Helper:
+- Runs **locally** on your machine - data never leaves your control
+- Is **read-only** - cannot modify, create, or delete records
+- Uses secure HTTPS connections to Salesforce
+- Stores credentials in `.env` file (add to `.gitignore`!)
+- Supports OAuth for maximum security
+- API keys protect the helper's endpoints
+
+**Q: What if I have IP restrictions?**
+
+A: If your org restricts API access by IP:
+- **Username/Password:** Whitelist your IP or use a security token
+- **OAuth:** The refresh token works from any IP once obtained
+- Contact your Salesforce admin to whitelist your IPs if needed
+
+**Q: Can multiple people use this in my org?**
+
+A: Yes! Each person can:
+- Run their own instance with their own credentials
+- Share a single instance (use a service account for OAuth)
+- Each user's queries will respect their individual permissions
+
+---
+
+### Quick Credential Check
+
+Before running setup, make sure you have ONE of these ready:
+
+**For Username + Password:**
+- [ ] Salesforce username (email)
+- [ ] Salesforce password
+- [ ] Security token (if needed)
+- [ ] Know if it's Production or Sandbox
+
+**For OAuth:**
+- [ ] Connected App created in Salesforce
+- [ ] Consumer Key (Client ID)
+- [ ] Consumer Secret (Client Secret)
+- [ ] Refresh Token (from OAuth flow)
+- [ ] Instance URL (e.g., `https://yourorg.my.salesforce.com`)
+
+---
+
 ## 🏁 Quick Start
 
 ### 1. Install
